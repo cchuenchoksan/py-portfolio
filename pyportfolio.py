@@ -15,14 +15,14 @@ class PyPortfolio:
             self.rf = rf
         
         self.update_tickers(tickers, start, end)
-        self._get_returns_and_cov()
 
         # Private for optimisation
         self._eq_constraint = {'type': 'eq', 'fun': self._equality_constraint}
         self._initial_weights = np.array([1/len(tickers) for _ in range(len(tickers))])
         self._bounds = [(-10, 10) for _ in range(len(self._initial_weights))]
 
-    def update_tickers(self, tickers, start, end):
+    def update_tickers(self, tickers, start="2014-01-01", end="2023-12-31"):
+        """Method to run when you would like to update the stocks in the portfolio"""
         self.tickers = tickers
         self.start = start
         self.end = end
@@ -31,19 +31,23 @@ class PyPortfolio:
         self.data = yf.download(tickers, start=start, end=end)["Adj Close"]
         ten_years_return = ((self.data.iloc[-1] - self.data.iloc[0]) / self.data.iloc[0]) * 100
         self.info['10-Y Return(%)'] = self.info['Ticker'].map(ten_years_return)
+        self._get_returns_and_cov()
 
     
     def _get_returns_and_cov(self):
+        """Private method to update the return and covariance matrix"""
         self.daily_r = self.data.pct_change().dropna()
-        self.expected_returns = self.daily_r.mean() * 252
+        self.expected_returns = self.daily_r.mean() * 252  # assume 252 trading days
         self.cov_matrix = self.daily_r.cov() * 252
 
 
     def _objective_min_vol(self):
+        """Returns an objective function which gives the volatility of the portfolio"""
         return lambda weights: np.sqrt(np.dot(weights.T, np.dot(self.cov_matrix, weights))) * 100
 
 
     def _objective_max_sharpe(self):
+        """Returns an objective function which gives the negative sharpe ratio"""
         return lambda weights: -((np.dot(weights, self.expected_returns) - self.rf) 
                                 / np.sqrt(np.dot(weights.T, np.dot(self.cov_matrix, weights))))
 
@@ -55,6 +59,7 @@ class PyPortfolio:
 
     @staticmethod
     def _generate_numbers(n: int):
+        """Generate n numbers where the each number is between -1 and 1 and all the numbers sum to 1"""
         if n <= 1:
             raise ValueError("n must be greater than 1.")
 
@@ -69,6 +74,14 @@ class PyPortfolio:
 
 
     def get_optimise_port(self, initial_weights=None):
+        """
+        Minimise the portfolio standard deviation to find the weights
+        
+        output: 
+        1. weights
+        2. returns
+        3. standard deviation
+        """
         if initial_weights is None:
             initial_weights = self._initial_weights
 
@@ -84,6 +97,14 @@ class PyPortfolio:
 
 
     def get_lowest_vol_port(self, initial_weights=None):
+        """
+        maximise the portfolio sharpe ratio to find the weights
+        
+        output: 
+        1. weights
+        2. returns
+        3. standard deviation
+        """
         if initial_weights is None:
             initial_weights = self._initial_weights
 
@@ -98,8 +119,14 @@ class PyPortfolio:
         return min_vol_weights, min_vol_returns, min_vol_std
 
 
-
     def run_monte_carlo_simulation(self, num_portfolios=10000):
+        """
+        Method to get montecarlo simulation of the ports
+        
+        output:
+        1. results: [[return, std, sharpe_ratio]]
+        2. weights
+        """
         results = np.zeros((3, num_portfolios))
         weights_record = []
 
