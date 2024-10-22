@@ -82,7 +82,7 @@ class PyPortfolio(YFData):
         self.info = self._get_info(tickers)
         self.data = yf.download(tickers, start=start, end=end)["Adj Close"]
         ten_years_return = ((self.data.iloc[-1] - self.data.iloc[0]) / self.data.iloc[0]) * 100
-        self.info['10-Y Return(%)'] = self.info['Ticker'].map(ten_years_return)
+        self.info['Period Return(%)'] = self.info['Ticker'].map(ten_years_return)
         self._get_returns_and_cov()
 
     
@@ -170,8 +170,15 @@ class PyPortfolio(YFData):
         min_vol_std = np.sqrt(np.dot(min_vol_weights.T, np.dot(self.cov_matrix, min_vol_weights)))
         return min_vol_weights, min_vol_returns, min_vol_std
 
+    
+    @staticmethod
+    def generate_numbers_positive(n):
+        random_numbers = np.random.rand(n)
+        normalized_numbers = random_numbers / np.sum(random_numbers)
+        return normalized_numbers
 
-    def run_monte_carlo_simulation(self, num_portfolios=10000):
+
+    def run_monte_carlo_simulation(self, num_portfolios=10000, postive=False):
         """
         Method to get montecarlo simulation of the ports
         
@@ -183,8 +190,12 @@ class PyPortfolio(YFData):
         weights_record = []
 
         for i in tqdm(range(num_portfolios)):
-            weights = self._generate_numbers(n=len(self.tickers))
-            weights_record.append(weights)
+            if postive:
+                weights = self.generate_numbers_positive(n=len(self.tickers))
+                weights_record.append(weights)
+            else:
+                weights = self._generate_numbers(n=len(self.tickers))
+                weights_record.append(weights)
 
             portfolio_return = self.get_returns(self.expected_returns, weights)
             portfolio_stddev = self.get_std(self.cov_matrix, weights)
